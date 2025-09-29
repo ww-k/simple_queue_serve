@@ -1,10 +1,10 @@
 {
-    "name": "queue-serve",
+    "name": "simple-queue-serve",
     "version": "0.0.1",
     "type": "module",
     "repository": {
         "type": "git",
-        "url": "https://github.com/ww-k/queue_serve.git"
+        "url": "https://github.com/ww-k/simple_queue_serve.git"
     },
     "exports": {
         ".": {
