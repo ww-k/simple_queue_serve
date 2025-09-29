@@ -1,8 +1,7 @@
-import type { ITaskState } from "./types";
+export type ITaskState = "init" | "start" | "running" | "done" | "error";
 
 /**
  *  任务合法的状态列表, 同步任务没有'running'状态
- *  @type {array}
  */
 const TASK_STATES: Set<ITaskState> = new Set([
     "init",
@@ -17,39 +16,17 @@ const TASK_STATES: Set<ITaskState> = new Set([
  */
 let taskId: number = 0;
 
-/**
- * state属性访问器，确保state只在允许的范围内，且不会被外部修改
- */
-function StateAccessor() {
-    let state: ITaskState = "init";
-
-    return {
-        get: () => state,
-        set: (v: ITaskState) => {
-            if (!TASK_STATES.has(v)) {
-                throw new Error("invalid state");
-            }
-            if (isEnd(state)) return;
-            state = v;
-        },
-    };
-}
-
-/**
- * 判断任务是否结束
- */
-function isEnd(state: ITaskState) {
-    return state === "done" || state === "error";
-}
-
 /** 任务类 */
 export default class Task {
-    readonly id: string;
-    state: ITaskState = "init";
-    _retryCount: number = 0;
+    id: string;
+    state: ITaskState;
     excutor: () => void | Promise<void>;
-    onDone?: () => void;
-    onError?: (err: unknown) => void;
+    #id: string;
+    #state: ITaskState = "init";
+    #retryCount: number = 0;
+    #excutor: () => void | Promise<void>;
+    #onDone?: () => void;
+    #onError?: (err: unknown) => void;
     constructor({
         excutor,
         onDone,
@@ -63,64 +40,85 @@ export default class Task {
             throw new Error("fn must be function");
         }
 
-        this.excutor = excutor;
-        this.onDone = onDone;
-        this.onError = onError;
+        this.#excutor = excutor;
+        this.#onDone = onDone;
+        this.#onError = onError;
 
-        this.id = `${Date.now()}_task_${++taskId}`;
+        this.#id = `${Date.now()}_task_${++taskId}`;
 
-        const stateAccessor = StateAccessor();
+        this.#retryCount = 0;
+
         Object.defineProperties(this, {
+            id: {
+                enumerable: true,
+                configurable: false,
+                get: () => this.#id,
+                set: () => null,
+            },
             state: {
                 enumerable: true,
                 configurable: false,
-                get: stateAccessor.get,
-                set: stateAccessor.set,
+                get: () => this.#state,
+                set: () => null,
+            },
+            excutor: {
+                enumerable: true,
+                configurable: false,
+                get: () => this.#excutor,
+                set: () => null,
             },
         });
 
-        this._retryCount = 0;
+        this.id = this.#id;
+        this.state = this.#state;
+        this.excutor = this.#excutor;
     }
 
-    setState(name: ITaskState) {
-        if (this.state !== name && !isEnd(this.state)) {
+    #setState(state: ITaskState) {
+        if (!TASK_STATES.has(state)) {
+            throw new Error("invalid state");
+        }
+        if (this.#state !== state && !this.isEnd()) {
             //不能重复设置state为相同状态
-            this.state = name;
+            this.#state = state;
         }
     }
 
     isEnd() {
-        return isEnd(this.state);
+        return this.#state === "done" || this.#state === "error";
     }
 
     /**
      * 开始执行任务
      */
-    start() {
-        if (this.state !== "init") return;
+    async start() {
+        if (this.#state !== "init") {
+            throw new Error("task has been started");
+        }
 
-        this.setState("start");
+        this.#setState("start");
 
-        if (typeof this.excutor === "function") {
+        if (typeof this.#excutor === "function") {
             const onDone = () => {
-                this.setState("done");
-                this.onDone?.();
+                this.#setState("done");
+                this.#onDone?.();
             };
             const onError = (err: unknown) => {
-                this.setState("error");
-                this.onError?.(err);
+                this.#setState("error");
+                this.#onError?.(err);
             };
             try {
-                const ret = this.excutor();
+                const ret = this.#excutor();
+                this.#setState("running");
 
-                if (ret && typeof ret.then === "function") {
-                    this.setState("running");
-                    ret.then(onDone).catch(onError);
-                } else {
-                    onDone();
-                }
+                const promise =
+                    ret && typeof ret.then === "function"
+                        ? ret
+                        : Promise.resolve(ret);
+                promise.then(onDone);
             } catch (error) {
                 onError(error);
+                throw error;
             }
         }
     }

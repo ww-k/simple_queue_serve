@@ -1,15 +1,17 @@
 {
-  "compilerOptions": {
-    "lib": ["ES2022"],
-    "module": "ESNext",
-    "noEmit": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "isolatedModules": true,
-    "resolveJsonModule": true,
-    "moduleResolution": "bundler",
-    "useDefineForClassFields": true,
-    "allowImportingTsExtensions": true
-  },
-  "include": ["src"]
+    "compilerOptions": {
+        "target": "es2015",
+        "lib": ["ES2022"],
+        "module": "ESNext",
+        "noEmit": true,
+        "strict": true,
+        "skipLibCheck": true,
+        "isolatedModules": true,
+        "resolveJsonModule": true,
+        "moduleResolution": "bundler",
+        "useDefineForClassFields": true,
+        "allowImportingTsExtensions": true
+    },
+    "include": ["src"],
+    "exclude": ["index.test.ts", "src/**/*.test.ts"]
 }

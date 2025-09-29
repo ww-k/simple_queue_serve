@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@rsbuild/core': 1.5.12
+
 importers:
 
   .:
@@ -18,6 +21,9 @@ importers:
       '@rslib/core':
         specifier: ^0.14.0
         version: 0.14.0(typescript@5.9.2)
+      '@rstest/core':
+        specifier: ^0.5.0
+        version: 0.5.0
       '@types/node':
         specifier: ^22.18.6
         version: 22.18.6
@@ -263,11 +269,30 @@ packages:
     resolution: {integrity: sha512-VynGOEsVw2s8TAlLf/uESfrgfrq2+rcXB1muPJYBWbsm1Oa6r5qVQhjA5ggM6z/coYPrsVMgovl3Ff7Q7OCp1w==}
     engines: {node: '>=16.0.0'}
 
+  '@rstest/core@0.5.0':
+    resolution: {integrity: sha512-quCVL+AqkkvqyCk1nwZttiPBSswRaKs7g/ZUvknaUwtvhQD1GM7fR9eMeqc3ddKs8nTmoILXqUdj44GxyumsHg==}
+    engines: {node: '>=18.12.0'}
+    hasBin: true
+    peerDependencies:
+      happy-dom: '*'
+      jsdom: '*'
+    peerDependenciesMeta:
+      happy-dom:
+        optional: true
+      jsdom:
+        optional: true
+
   '@swc/helpers@0.5.17':
     resolution: {integrity: sha512-5IKx/Y13RsYd+sauPb2x+U/xZikHjolzfuDgTAl/Tdf3Q8rslRvC19NKDLgAJQ6wsqADk10ntlv08nPFw/gO/A==}
 
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
+
+  '@types/chai@5.2.2':
+    resolution: {integrity: sha512-8kB30R7Hwqf40JPiKhVzodJs2Qc1ZJ5zuT3uzw5Hq/dhNCl3G3l83jfpdI1e20BP348+fV7VIL/+FxaXkqBmWg==}
+
+  '@types/deep-eql@4.0.2':
+    resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
 
   '@types/node@22.18.6':
     resolution: {integrity: sha512-r8uszLPpeIWbNKtvWRt/DbVi5zbqZyj1PTmhRMqBMvDnaz1QpmSKujUtJLrqGZeoM8v72MfYggDceY4K1itzWQ==}
@@ -287,7 +312,7 @@ packages:
     engines: {node: '>=18.12.0'}
     peerDependencies:
       '@microsoft/api-extractor': ^7
-      '@rsbuild/core': 1.x
+      '@rsbuild/core': 1.5.12
       '@typescript/native-preview': 7.x
       typescript: ^5
     peerDependenciesMeta:
@@ -297,6 +322,10 @@ packages:
         optional: true
       typescript:
         optional: true
+
+  tinypool@1.1.1:
+    resolution: {integrity: sha512-Zba82s87IFq9A9XmjiX5uZA/ARWDrB03OHlq+Vw1fSdt0I+4/Kutwy8BP4Y/y/aORMo61FQ0vIb5j44vSo5Pkg==}
+    engines: {node: ^18.0.0 || >=20.0.0}
 
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
@@ -505,6 +534,12 @@ snapshots:
 
   '@rspack/lite-tapable@1.0.1': {}
 
+  '@rstest/core@0.5.0':
+    dependencies:
+      '@rsbuild/core': 1.5.12
+      '@types/chai': 5.2.2
+      tinypool: 1.1.1
+
   '@swc/helpers@0.5.17':
     dependencies:
       tslib: 2.8.1
@@ -513,6 +548,12 @@ snapshots:
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  '@types/chai@5.2.2':
+    dependencies:
+      '@types/deep-eql': 4.0.2
+
+  '@types/deep-eql@4.0.2': {}
 
   '@types/node@22.18.6':
     dependencies:
@@ -530,6 +571,8 @@ snapshots:
       '@rsbuild/core': 1.5.12
     optionalDependencies:
       typescript: 5.9.2
+
+  tinypool@1.1.1: {}
 
   tslib@2.8.1: {}
 
