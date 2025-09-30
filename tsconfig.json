@@ -13,5 +13,5 @@
         "allowImportingTsExtensions": true
     },
     "include": ["src"],
-    "exclude": ["index.test.ts", "src/**/*.test.ts"]
+    "exclude": ["tests"]
 }
