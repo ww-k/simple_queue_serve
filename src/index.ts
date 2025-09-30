@@ -8,7 +8,6 @@ type IQueueState =
     | "init"
     | "running"
     | "pause"
-    | "standby"
     | "stopping"
     | "abort"
     | "done"
@@ -21,24 +20,32 @@ interface IQueueOption {
     interval?: number;
 }
 
+type IStateEvent = "running" | "pause" | "stopping" | "done";
+
 type IEvents<T extends Task> = {
-    init: undefined;
     running: undefined;
     pause: undefined;
-    standby: undefined;
     stopping: undefined;
-    abort: undefined;
     done: undefined;
-    error: undefined;
     resume: IQueueState;
-    progress: {
+    idle: undefined;
+    taskdone: {
         running: number;
         pending: number;
-        result: unknown;
+        result?: unknown;
         task: T;
     };
-    taskstart: T;
-    taskerror: { err: unknown; task: T };
+    taskstart: {
+        running: number;
+        pending: number;
+        task: T;
+    };
+    taskerror: {
+        running: number;
+        pending: number;
+        err?: unknown;
+        task: T;
+    };
 };
 /**
  *  合法的状态集合
@@ -47,7 +54,6 @@ const QUEUE_STATES: Set<IQueueState> = new Set([
     "init",
     "running",
     "pause",
-    "standby",
     "stopping",
     "abort",
     "done",
@@ -99,7 +105,7 @@ export default class QueueService<T extends Task> {
         });
     }
 
-    #setState(state: IQueueState, event?: IEvents<T>[IQueueState]) {
+    #setState(state: IStateEvent, event?: IEvents<T>[IStateEvent]) {
         if (!QUEUE_STATES.has(state)) {
             throw new Error("invalid state");
         }
@@ -152,7 +158,11 @@ export default class QueueService<T extends Task> {
     stop() {
         if (this.isEnd()) return;
 
-        this.#setState("stopping");
+        if (this.#runningTaskMap.size === 0 && this.#pendingList.length === 0) {
+            this.#setState("done");
+        } else {
+            this.#setState("stopping");
+        }
     }
 
     /**
@@ -166,17 +176,15 @@ export default class QueueService<T extends Task> {
         this.#runningTaskMap.clear();
         this.#pendingList.length = 0;
 
-        this.#setState("abort");
+        this.#state = "abort";
     }
 
     /**
      * 暂停队列服务, 不会有新的任务从等待列表进入执行状态。
      */
     pause() {
-        if (this.#state !== "running" && this.#state !== "standby") {
-            console.log(
-                "only can pause when queue state is running or standby",
-            );
+        if (this.#state !== "running") {
+            console.log("only can pause when queue state is running");
             return;
         }
 
@@ -214,11 +222,7 @@ export default class QueueService<T extends Task> {
      * 判断当前能否往队列中添加任务
      */
     #canAddTask() {
-        return (
-            this.#state === "init" ||
-            this.#state === "running" ||
-            this.#state === "standby"
-        );
+        return this.#state === "init" || this.#state === "running";
     }
 
     /**
@@ -276,7 +280,7 @@ export default class QueueService<T extends Task> {
             }
             const __task_event_on_queue_done = (ret: unknown) => {
                 this.#runningTaskMap.delete(task.id);
-                this.#emit("progress", {
+                this.#emit("taskdone", {
                     running: this.#runningTaskMap.size,
                     pending: this.#pendingList.length,
                     result: ret,
@@ -288,6 +292,8 @@ export default class QueueService<T extends Task> {
             const __task_event_on_queue_error = (err: unknown) => {
                 this.#runningTaskMap.delete(task.id);
                 this.#emit("taskerror", {
+                    running: this.#runningTaskMap.size,
+                    pending: this.#pendingList.length,
                     err,
                     task,
                 });
@@ -296,7 +302,11 @@ export default class QueueService<T extends Task> {
             };
             this.#runningTaskMap.set(task.id, task);
             setTimeout(() => {
-                this.#emit("taskstart", task);
+                this.#emit("taskstart", {
+                    running: this.#runningTaskMap.size,
+                    pending: this.#pendingList.length,
+                    task,
+                });
                 task.start()
                     .then(__task_event_on_queue_done)
                     .catch(__task_event_on_queue_error);
@@ -326,8 +336,7 @@ export default class QueueService<T extends Task> {
             if (this.#state === "stopping") {
                 this.#setState("done");
             } else {
-                //如果队列中没有任务了，且不是stopping状态，让队列进入待机状态，节省资源
-                this.#setState("standby");
+                this.#emit("idle", undefined);
             }
 
             return;
@@ -335,10 +344,6 @@ export default class QueueService<T extends Task> {
 
         if (this.#queueTimer || this.#state === "pause") {
             return;
-        }
-
-        if (this.#state === "standby") {
-            this.#setState("running");
         }
 
         this.#queueTimer = setTimeout(() => {
