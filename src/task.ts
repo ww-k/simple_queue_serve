@@ -24,6 +24,7 @@ export default class Task {
     #id: string;
     #state: ITaskState = "init";
     #retryCount: number = 0;
+    #promise?: Promise<void>;
     #excutor: () => void | Promise<void>;
     #onDone?: () => void;
     #onError?: (err: unknown) => void;
@@ -92,8 +93,8 @@ export default class Task {
      * 开始执行任务
      */
     async start() {
-        if (this.#state !== "init") {
-            throw new Error("task has been started");
+        if (this.#promise) {
+            return this.#promise;
         }
 
         this.#setState("start");
@@ -115,7 +116,9 @@ export default class Task {
                     ret && typeof ret.then === "function"
                         ? ret
                         : Promise.resolve(ret);
-                promise.then(onDone);
+                this.#promise = promise;
+                await promise;
+                onDone?.();
             } catch (error) {
                 onError(error);
                 throw error;
