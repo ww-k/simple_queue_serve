@@ -2,7 +2,7 @@ import mitt from "mitt";
 
 import Task from "./task";
 
-import type { Emitter } from "mitt";
+import type { Emitter, Handler } from "mitt";
 
 type IQueueState =
     | "init"
@@ -107,11 +107,24 @@ export default class QueueService<T extends Task> {
             //不能重复设置state为相同状态
             this.#state = state;
             if (this.#state === state) {
-                console.log("queue state change", state, event);
                 //状态成功改变才触发事件
                 this.#emit(state, event);
             }
         }
+    }
+
+    on<Key extends keyof IEvents<T>>(
+        type: Key,
+        handler: Handler<IEvents<T>[Key]>,
+    ) {
+        this.#emitter.on(type, handler);
+    }
+
+    off<Key extends keyof IEvents<T>>(
+        type: Key,
+        handler?: Handler<IEvents<T>[Key]>,
+    ) {
+        this.#emitter.off(type, handler);
     }
 
     #emit<Key extends keyof IEvents<T>>(name: Key, event: IEvents<T>[Key]) {
@@ -361,3 +374,5 @@ export default class QueueService<T extends Task> {
         return task;
     }
 }
+
+export { Task };
