@@ -11,7 +11,7 @@
 
 - 并发控制（concurrency）和执行间隔（interval）。
 - 任务排队（push / unshift）、移除与清空。
-- 支持队列状态事件：init、running、pause、standby、stopping、abort、done、error 等。
+- 支持队列状态事件：running、pause、stopping、done、resume 等。
 - 任务事件与进度回调（taskstart、progress、taskerror）。
 - 轻量，无外部运行时依赖（代码中仅用于事件发射的 `mitt`）。
 
@@ -41,7 +41,8 @@ import QueueService, { Task } from 'simple-queue-serve';
 const q = new QueueService({ concurrency: 3, interval: 50 });
 
 q.on('taskstart', (task) => console.log('开始任务', task.id));
-q.on('progress', (p) => console.log('进度', p));
+q.on('taskend', (p) => console.log('进度', p));
+q.on('taskerror', (p) => console.log('进度', p));
 q.start();
 
 q.push(() => Promise.resolve(console.log('简单函数任务')));
@@ -76,6 +77,34 @@ q.push(new ComplexTask());
 	- 方法：start()
 	- 属性：id, state, excutor
 
+- QueueService Events
+```
+type IEvents<T extends Task> = {
+    running: undefined;
+    pause: undefined;
+    stopping: undefined;
+    done: undefined;
+    resume: IQueueState;
+    idle: undefined;
+    taskdone: {
+        running: number;
+        pending: number;
+        result?: unknown;
+        task: T;
+    };
+    taskstart: {
+        running: number;
+        pending: number;
+        task: T;
+    };
+    taskerror: {
+        running: number;
+        pending: number;
+        err?: unknown;
+        task: T;
+    };
+};
+```
 更多实现细节请参阅 `src/index.ts` 与 `src/task.ts`。
 
 ## 贡献与许可

@@ -81,6 +81,7 @@ export default class QueueService<T extends Task> {
     #queueTimer?: number | NodeJS.Timeout;
     #stateBeforePause?: IQueueState;
     #emitter: Emitter<IEvents<T>>;
+    #addAndNextTimer?: number | NodeJS.Timeout;
     /**
      * 创建一个任务队列
      */
@@ -156,7 +157,7 @@ export default class QueueService<T extends Task> {
      * 停止队列服务, 等待队列中的剩余任务执行完再停止，且不在接收新的任务加入队列。
      */
     stop() {
-        if (this.isEnd()) return;
+        if (this.isEnd() || this.state === "stopping") return;
 
         if (this.#runningTaskMap.size === 0 && this.#pendingList.length === 0) {
             this.#setState("done");
@@ -173,6 +174,8 @@ export default class QueueService<T extends Task> {
 
         clearTimeout(this.#queueTimer);
         this.#queueTimer = undefined;
+        clearTimeout(this.#addAndNextTimer);
+        this.#addAndNextTimer = undefined;
         this.#runningTaskMap.clear();
         this.#pendingList.length = 0;
 
@@ -190,6 +193,9 @@ export default class QueueService<T extends Task> {
 
         clearTimeout(this.#queueTimer);
         this.#queueTimer = undefined;
+
+        clearTimeout(this.#addAndNextTimer);
+        this.#addAndNextTimer = undefined;
 
         this.#stateBeforePause = this.#state;
         this.#setState("pause");
@@ -216,13 +222,6 @@ export default class QueueService<T extends Task> {
             this.#state === "error" ||
             this.#state === "abort"
         );
-    }
-
-    /**
-     * 判断当前能否往队列中添加任务
-     */
-    #canAddTask() {
-        return this.#state === "init" || this.#state === "running";
     }
 
     /**
@@ -274,10 +273,6 @@ export default class QueueService<T extends Task> {
      */
     #nextTask() {
         const taskRunner = (task: T) => {
-            if (task.isEnd()) {
-                this.#setDoneOrNextTask();
-                return;
-            }
             const __task_event_on_queue_done = (ret: unknown) => {
                 this.#runningTaskMap.delete(task.id);
                 this.#emit("taskdone", {
@@ -302,6 +297,8 @@ export default class QueueService<T extends Task> {
             };
             this.#runningTaskMap.set(task.id, task);
             setTimeout(() => {
+                if (this.#state !== "running") return;
+
                 this.#emit("taskstart", {
                     running: this.#runningTaskMap.size,
                     pending: this.#pendingList.length,
@@ -347,6 +344,9 @@ export default class QueueService<T extends Task> {
         }
 
         this.#queueTimer = setTimeout(() => {
+            if (this.state !== "running") {
+                return;
+            }
             this.#nextTask();
             this.#queueTimer = undefined;
         }, this.#configuration.interval);
@@ -358,7 +358,7 @@ export default class QueueService<T extends Task> {
      * @param {function} fn 任务函数
      */
     #addTask(jump: boolean, fn: T | (() => void)) {
-        if (!this.#canAddTask()) {
+        if (this.isEnd() || this.#state === "stopping") {
             throw new Error("queue can not add task in current state");
         }
 
@@ -371,10 +371,14 @@ export default class QueueService<T extends Task> {
             throw new Error("task must be function or instanceof Task");
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
         jump ? this.#pendingList.unshift(task) : this.#pendingList.push(task);
 
-        setTimeout(() => this.#setDoneOrNextTask());
+        if (this.#addAndNextTimer === undefined && this.#state === "running") {
+            this.#addAndNextTimer = setTimeout(() => {
+                this.#addAndNextTimer = undefined;
+                this.#setDoneOrNextTask();
+            });
+        }
 
         return task;
     }
