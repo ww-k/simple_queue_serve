@@ -4,14 +4,7 @@ import Task from "./task";
 
 import type { Emitter, Handler } from "mitt";
 
-type IQueueState =
-    | "init"
-    | "running"
-    | "pause"
-    | "stopping"
-    | "abort"
-    | "done"
-    | "error";
+type IQueueState = "running" | "pause" | "abort";
 
 interface IQueueOption {
     /** 并发任务数 */
@@ -20,13 +13,10 @@ interface IQueueOption {
     interval?: number;
 }
 
-type IStateEvent = "running" | "pause" | "stopping" | "done";
+type IStateEvent = "pause";
 
 type IEvents<T extends Task> = {
-    running: undefined;
     pause: undefined;
-    stopping: undefined;
-    done: undefined;
     resume: IQueueState;
     idle: undefined;
     taskdone: {
@@ -51,21 +41,17 @@ type IEvents<T extends Task> = {
  *  合法的状态集合
  */
 const QUEUE_STATES: Set<IQueueState> = new Set([
-    "init",
     "running",
     "pause",
-    "stopping",
     "abort",
-    "done",
-    "error",
 ] as IQueueState[]);
 
 /** 任务队列类 */
 export default class QueueService<T extends Task> {
     /** 队列的长度，运行中的+排队中的 */
     length: number = 0;
-    state: IQueueState = "init";
-    #state: IQueueState = "init";
+    state: IQueueState = "running";
+    #state: IQueueState = "running";
     /** 配置对象 */
     #configuration = {
         /** 并发任务数 */
@@ -76,7 +62,7 @@ export default class QueueService<T extends Task> {
     /** 排队中的任务列表 */
     #pendingList: T[] = [];
     /** 运行中的任务map */
-    #runningTaskMap: Map<string, T> = new Map();
+    #runningTaskMap: Map<number, T> = new Map();
     /** 队列运行的定时检查的timerId */
     #queueTimer?: number | NodeJS.Timeout;
     #stateBeforePause?: IQueueState;
@@ -86,7 +72,6 @@ export default class QueueService<T extends Task> {
      * 创建一个任务队列
      */
     constructor(option?: IQueueOption) {
-        this.#state = "init";
         this.#emitter = mitt<IEvents<T>>();
         if (option) {
             this.setConfig(option);
@@ -143,30 +128,6 @@ export default class QueueService<T extends Task> {
     }
 
     /**
-     * 启动队列服务，队列中任务都执行完毕后，队列会进入待机状态，有新任务进入队列时，也重新激活队列。
-     */
-    start() {
-        if (this.#state !== "init") return;
-
-        this.#setState("running");
-
-        this.#nextTask();
-    }
-
-    /**
-     * 停止队列服务, 等待队列中的剩余任务执行完再停止，且不在接收新的任务加入队列。
-     */
-    stop() {
-        if (this.isEnd() || this.state === "stopping") return;
-
-        if (this.#runningTaskMap.size === 0 && this.#pendingList.length === 0) {
-            this.#setState("done");
-        } else {
-            this.#setState("stopping");
-        }
-    }
-
-    /**
      * 中止队列服务, 会停止队列服务，并立即清空队列中等待执行的任务。
      */
     abort() {
@@ -217,11 +178,7 @@ export default class QueueService<T extends Task> {
      * 是否结束
      */
     isEnd() {
-        return (
-            this.#state === "done" ||
-            this.#state === "error" ||
-            this.#state === "abort"
-        );
+        return this.#state === "abort";
     }
 
     /**
@@ -321,21 +278,12 @@ export default class QueueService<T extends Task> {
     }
 
     #setDoneOrNextTask() {
-        if (this.#state === "init") {
-            return;
-        }
-
         //队列中没有任务的时候
         if (this.#runningTaskMap.size === 0 && this.#pendingList.length === 0) {
             clearTimeout(this.#queueTimer);
             this.#queueTimer = undefined;
 
-            if (this.#state === "stopping") {
-                this.#setState("done");
-            } else {
-                this.#emit("idle", undefined);
-            }
-
+            this.#emit("idle", undefined);
             return;
         }
 
@@ -358,7 +306,7 @@ export default class QueueService<T extends Task> {
      * @param {function} fn 任务函数
      */
     #addTask(jump: boolean, fn: T | (() => void)) {
-        if (this.isEnd() || this.#state === "stopping") {
+        if (this.isEnd()) {
             throw new Error("queue can not add task in current state");
         }
 
@@ -366,7 +314,7 @@ export default class QueueService<T extends Task> {
         if (fn instanceof Task) {
             task = fn;
         } else if (typeof fn === "function") {
-            task = new Task({ excutor: fn }) as T;
+            task = new Task(fn) as T;
         } else {
             throw new Error("task must be function or instanceof Task");
         }

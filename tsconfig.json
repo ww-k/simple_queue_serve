@@ -13,5 +13,5 @@
         "allowImportingTsExtensions": true
     },
     "include": ["src"],
-    "exclude": ["tests"]
+    "exclude": ["tests", "node_modules", "**/node_modules/*"]
 }

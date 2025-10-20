@@ -11,9 +11,7 @@
 
 - 并发控制（concurrency）和执行间隔（interval）。
 - 任务排队（push / unshift）、移除与清空。
-- 支持队列状态事件：running、pause、stopping、done、resume 等。
-- 任务事件与进度回调（taskstart、progress、taskerror）。
-- 轻量，无外部运行时依赖（代码中仅用于事件发射的 `mitt`）。
+- 轻量，仅依赖用于事件发射的 `mitt`。
 
 ## 安装
 
@@ -49,15 +47,9 @@ q.push(() => Promise.resolve(console.log('简单函数任务')));
 
 class ComplexTask extends Task {
     constructor() {
-        super({
-            excutor: () => {
-                return this.#start();
-            }
+        super(() => {
+            console.log('复杂任务开始');
         });
-    }
-
-    async #start() {
-        console.log('复杂任务开始');
     }
 }
 
@@ -70,7 +62,7 @@ q.push(new ComplexTask());
 - QueueService(option?)
 	- option.concurrency: 并发数（默认 5）
 	- option.interval: 每次调度的间隔 ms（默认 25）
-	- 方法：start(), stop(), pause(), resume(), abort(), push(fn|Task), unshift(fn|Task), remove(task), clear(), forEach(cb), on(event, handler), off(event, handler)
+	- 方法：pause(), resume(), abort(), push(fn|Task), unshift(fn|Task), remove(task), clear(), forEach(cb), on(event, handler), off(event, handler)
 
 - Task
 	- 构造：new Task({ excutor: () => void | Promise<void>, onDone?, onError? })
@@ -80,10 +72,7 @@ q.push(new ComplexTask());
 - QueueService Events
 ```
 type IEvents<T extends Task> = {
-    running: undefined;
     pause: undefined;
-    stopping: undefined;
-    done: undefined;
     resume: IQueueState;
     idle: undefined;
     taskdone: {
