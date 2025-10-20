@@ -20,6 +20,7 @@ jobs:
           version: 10
           run_install: true
       - run: pnpm test
+      - run: pnpm build
 
   publish-npm:
     needs: build
@@ -30,7 +31,6 @@ jobs:
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org/
-      - run: pnpm install --frozen-lockfile
       - run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{secrets.npm_token}}
